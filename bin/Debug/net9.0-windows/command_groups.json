@@ -1,0 +1,26 @@
+[
+  {
+    "Name": "示例 - Node.js 服务",
+    "StartCommand": "cd C:\\path\\to\\node-project; node app.js",
+    "StopCommand": "",
+    "RestartCommand": ""
+  },
+  {
+    "Name": "示例 - Python 服务",
+    "StartCommand": "cd C:\\path\\to\\python-project; python main.py",
+    "StopCommand": "",
+    "RestartCommand": ""
+  },
+  {
+    "Name": "示例 - Nginx",
+    "StartCommand": "cd C:\\nginx; start nginx.exe",
+    "StopCommand": "cd C:\\nginx; nginx.exe -s stop",
+    "RestartCommand": "cd C:\\nginx; nginx.exe -s reload"
+  },
+  {
+    "Name": "示例 - Redis",
+    "StartCommand": "cd C:\\Redis; redis-server.exe redis.windows.conf",
+    "StopCommand": "",
+    "RestartCommand": ""
+  }
+]

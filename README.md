@@ -22,6 +22,30 @@
 | 进程管理 | System.Diagnostics.Process | - |
 | 进程树查询 | System.Management | - |
 
+## 快速开始
+
+### 方法一：直接下载使用
+
+1. 从 GitHub 仓库下载 `bin/Debug/net9.0-windows/` 目录下的所有文件
+2. 确保已安装 [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0)
+3. 运行 `ProcessMonitor.exe` 启动应用程序
+
+### 方法二：源码编译
+
+```bash
+# 克隆仓库
+git clone https://github.com/BWX-BIT/powershell-command-group-manager.git
+
+# 进入项目目录
+cd powershell-command-group-manager
+
+# 编译
+dotnet build
+
+# 运行
+dotnet run
+```
+
 ## 使用方法
 
 ### 启动应用
@@ -95,15 +119,17 @@ cd C:\path\to\project; npm start
 
 ```
 ProcessMonitor/
-├── ProcessMonitor.csproj    # 项目配置文件
-├── App.xaml                 # 应用程序入口
-├── App.xaml.cs              # 应用程序逻辑
-├── MainWindow.xaml          # 主窗口界面
-├── MainWindow.xaml.cs       # 主窗口逻辑
-├── CommandGroup.cs          # 命令组数据模型
-├── ProcessManager.cs        # 进程管理核心
-├── ConfigManager.cs         # 配置管理
-└── command_groups.json      # 命令组配置文件
+├── bin/                       # 编译输出目录
+│   └── Debug/net9.0-windows/  # 可执行文件
+├── ProcessMonitor.csproj      # 项目配置文件
+├── App.xaml                   # 应用程序入口
+├── App.xaml.cs                # 应用程序逻辑
+├── MainWindow.xaml            # 主窗口界面
+├── MainWindow.xaml.cs         # 主窗口逻辑
+├── CommandGroup.cs            # 命令组数据模型
+├── ProcessManager.cs          # 进程管理核心
+├── ConfigManager.cs           # 配置管理
+└── command_groups.json        # 命令组配置文件
 ```
 
 ## 编译运行

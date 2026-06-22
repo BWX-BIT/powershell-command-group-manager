@@ -1,6 +1,4 @@
-bin/
 obj/
 *.user
 *.suo
 .DS_Store
-command_groups.json
