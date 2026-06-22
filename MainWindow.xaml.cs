@@ -269,6 +269,8 @@ namespace ProcessMonitor
         {
             if (currentGroup != null && !string.IsNullOrEmpty(currentGroup.StartCommand))
             {
+                // 清空上次的输出日志
+                currentGroup.Output = "";
                 AppendOutput(currentGroup, $"重启命令组: {currentGroup.Name}\n");
 
                 if (!string.IsNullOrEmpty(currentGroup.RestartCommand))

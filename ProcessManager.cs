@@ -19,6 +19,12 @@ namespace ProcessMonitor
                 return;
             }
 
+            // 清空上次的输出日志
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                group.Output = "";
+            });
+
             try
             {
                 string workingDir = ExtractWorkingDirectory(group.StartCommand);
