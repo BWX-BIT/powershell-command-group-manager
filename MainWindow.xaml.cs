@@ -251,9 +251,28 @@ namespace ProcessMonitor
             {
                 AppendOutput(currentGroup, $"停止命令组: {currentGroup.Name}\n");
 
-                if (currentGroup.Process == null || currentGroup.Process.HasExited)
+                // 检查进程是否存在或已退出
+                bool hasExited = true;
+                try
+                {
+                    if (currentGroup.Process != null)
+                    {
+                        hasExited = currentGroup.Process.HasExited;
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    // 进程已被外部终止，进程对象无效
+                    hasExited = true;
+                }
+
+                if (hasExited)
                 {
                     AppendOutput(currentGroup, "没有运行中的进程\n");
+                    currentGroup.Process = null;
+                    currentGroup.ParentProcess = null;
+                    currentGroup.IsRunning = false;
+                    UpdateCommandGroupStatus();
                     return;
                 }
 

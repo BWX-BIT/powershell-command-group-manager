@@ -216,9 +216,28 @@ namespace ProcessMonitor
         {
             try
             {
-                if (group.Process == null || group.Process.HasExited)
+                // 检查进程是否存在或已退出
+                bool hasExited = true;
+                try
+                {
+                    if (group.Process != null)
+                    {
+                        hasExited = group.Process.HasExited;
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    // 进程已被外部终止，进程对象无效
+                    hasExited = true;
+                }
+
+                if (hasExited)
                 {
                     RaiseOutput(group, "没有运行中的进程\n");
+                    group.Process = null;
+                    group.ParentProcess = null;
+                    group.IsRunning = false;
+                    updateStatus?.Invoke();
                     return;
                 }
 
@@ -226,7 +245,14 @@ namespace ProcessMonitor
                 
                 if (gracefulStopped)
                 {
-                    RaiseOutput(group, $"进程已优雅退出，退出码: {group.Process.ExitCode}\n");
+                    try
+                    {
+                        RaiseOutput(group, $"进程已优雅退出，退出码: {group.Process?.ExitCode ?? 0}\n");
+                    }
+                    catch
+                    {
+                        RaiseOutput(group, "进程已优雅退出\n");
+                    }
                     group.Process = null;
                     group.ParentProcess = null;
                     group.IsRunning = false;
@@ -240,12 +266,32 @@ namespace ProcessMonitor
             catch (Exception ex)
             {
                 RaiseOutput(group, $"停止进程失败: {ex.Message}\n");
+                // 确保清理状态
+                group.Process = null;
+                group.ParentProcess = null;
+                group.IsRunning = false;
+                updateStatus?.Invoke();
             }
         }
 
         public static async Task<bool> TryGracefulStopAsync(CommandGroup group)
         {
-            if (group.Process == null || group.Process.HasExited)
+            // 检查进程是否存在或已退出
+            bool hasExited = true;
+            try
+            {
+                if (group.Process != null)
+                {
+                    hasExited = group.Process.HasExited;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // 进程已被外部终止
+                hasExited = true;
+            }
+
+            if (hasExited)
             {
                 return true;
             }
@@ -264,7 +310,19 @@ namespace ProcessMonitor
 
             // ========== 第二层：使用 taskkill /T 发送控制台关闭信号 ==========
             RaiseOutput(group, "【第二层】尝试使用 taskkill /T 发送控制台关闭信号...\n");
-            if (await TryTaskKillWithSignalAsync(group.Process.Id))
+            
+            int processId = 0;
+            try
+            {
+                processId = group.Process?.Id ?? 0;
+            }
+            catch (InvalidOperationException)
+            {
+                // 进程已被外部终止
+                return true;
+            }
+
+            if (processId > 0 && await TryTaskKillWithSignalAsync(processId))
             {
                 // 等待 3 秒让进程优雅退出
                 if (await WaitForProcessExitAsync(group.Process, 3000))
@@ -303,7 +361,22 @@ namespace ProcessMonitor
         {
             try
             {
-                if (group.Process == null || group.Process.HasExited)
+                // 检查进程是否存在或已退出
+                bool hasExited = true;
+                try
+                {
+                    if (group.Process != null)
+                    {
+                        hasExited = group.Process.HasExited;
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    // 进程已被外部终止
+                    return true;
+                }
+
+                if (hasExited)
                     return true;
 
                 // CloseMainWindow() 对控制台程序有效
@@ -380,45 +453,104 @@ namespace ProcessMonitor
             try
             {
                 // 先终止子进程（如果存在且与父进程不同）
-                if (group.Process != null && !group.Process.HasExited && 
-                    group.ParentProcess != null && group.Process.Id != group.ParentProcess.Id)
+                int childProcessId = 0;
+                int parentProcessId = 0;
+                
+                try
                 {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = "taskkill.exe",
-                        Arguments = $"/F /T /PID {group.Process.Id}",
-                        CreateNoWindow = true,
-                        UseShellExecute = false
-                    }).WaitForExit();
-
-                    RaiseOutput(group, $"进程 {group.Process.Id} 及其子进程已终止\n");
+                    childProcessId = group.Process?.Id ?? 0;
+                }
+                catch (InvalidOperationException)
+                {
+                    // 子进程已被外部终止
+                    childProcessId = 0;
                 }
 
-                // 再终止父进程（PowerShell）
-                if (group.ParentProcess != null && !group.ParentProcess.HasExited)
+                try
                 {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = "taskkill.exe",
-                        Arguments = $"/F /T /PID {group.ParentProcess.Id}",
-                        CreateNoWindow = true,
-                        UseShellExecute = false
-                    }).WaitForExit();
-
-                    RaiseOutput(group, $"PowerShell 进程 {group.ParentProcess.Id} 已终止\n");
+                    parentProcessId = group.ParentProcess?.Id ?? 0;
                 }
-                else if (group.Process != null && !group.Process.HasExited)
+                catch (InvalidOperationException)
+                {
+                    // 父进程已被外部终止
+                    parentProcessId = 0;
+                }
+
+                // 终止子进程
+                if (childProcessId > 0 && childProcessId != parentProcessId)
+                {
+                    try
+                    {
+                        var childProcess = Process.GetProcessById(childProcessId);
+                        if (!childProcess.HasExited)
+                        {
+                            Process.Start(new ProcessStartInfo
+                            {
+                                FileName = "taskkill.exe",
+                                Arguments = $"/F /T /PID {childProcessId}",
+                                CreateNoWindow = true,
+                                UseShellExecute = false
+                            }).WaitForExit();
+
+                            RaiseOutput(group, $"进程 {childProcessId} 及其子进程已终止\n");
+                        }
+                    }
+                    catch (ArgumentException)
+                    {
+                        // 进程不存在，已被外部终止
+                        RaiseOutput(group, $"子进程 {childProcessId} 已被外部终止\n");
+                    }
+                }
+
+                // 终止父进程（PowerShell）
+                if (parentProcessId > 0)
+                {
+                    try
+                    {
+                        var parentProcess = Process.GetProcessById(parentProcessId);
+                        if (!parentProcess.HasExited)
+                        {
+                            Process.Start(new ProcessStartInfo
+                            {
+                                FileName = "taskkill.exe",
+                                Arguments = $"/F /T /PID {parentProcessId}",
+                                CreateNoWindow = true,
+                                UseShellExecute = false
+                            }).WaitForExit();
+
+                            RaiseOutput(group, $"PowerShell 进程 {parentProcessId} 已终止\n");
+                        }
+                    }
+                    catch (ArgumentException)
+                    {
+                        // 进程不存在，已被外部终止
+                        RaiseOutput(group, $"PowerShell 进程 {parentProcessId} 已被外部终止\n");
+                    }
+                }
+                else if (childProcessId > 0)
                 {
                     // 如果没有父进程引用，终止当前进程
-                    Process.Start(new ProcessStartInfo
+                    try
                     {
-                        FileName = "taskkill.exe",
-                        Arguments = $"/F /T /PID {group.Process.Id}",
-                        CreateNoWindow = true,
-                        UseShellExecute = false
-                    }).WaitForExit();
+                        var process = Process.GetProcessById(childProcessId);
+                        if (!process.HasExited)
+                        {
+                            Process.Start(new ProcessStartInfo
+                            {
+                                FileName = "taskkill.exe",
+                                Arguments = $"/F /T /PID {childProcessId}",
+                                CreateNoWindow = true,
+                                UseShellExecute = false
+                            }).WaitForExit();
 
-                    RaiseOutput(group, $"进程 {group.Process.Id} 及其子进程已终止\n");
+                            RaiseOutput(group, $"进程 {childProcessId} 及其子进程已终止\n");
+                        }
+                    }
+                    catch (ArgumentException)
+                    {
+                        // 进程不存在，已被外部终止
+                        RaiseOutput(group, $"进程 {childProcessId} 已被外部终止\n");
+                    }
                 }
 
                 group.Process = null;
@@ -429,6 +561,11 @@ namespace ProcessMonitor
             catch (Exception ex)
             {
                 RaiseOutput(group, $"终止进程失败: {ex.Message}\n");
+                // 确保清理状态
+                group.Process = null;
+                group.ParentProcess = null;
+                group.IsRunning = false;
+                updateStatus?.Invoke();
             }
         }
 
